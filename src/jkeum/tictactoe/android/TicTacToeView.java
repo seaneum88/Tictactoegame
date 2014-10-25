@@ -2,7 +2,6 @@ package jkeum.tictactoe.android;
 
 import jkeum.gameengine.GenericGrid;
 import jkeum.gameengine.GridPosition;
-import jkeum.gameengine.interfaces.IFixedPiecePlayer;
 import jkeum.gameengine.tictactoe.TicTacToePiece;
 import jkeum.tictactoe.R;
 import android.content.Context;
@@ -17,9 +16,6 @@ import android.graphics.Paint.Style;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
-import android.os.Handler;
-import android.os.Handler.Callback;
-import android.os.Message;
 import android.os.Parcelable;
 import android.util.AttributeSet;
 import android.view.MotionEvent;
