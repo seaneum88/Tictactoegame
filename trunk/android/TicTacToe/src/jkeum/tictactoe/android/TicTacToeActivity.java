@@ -10,22 +10,21 @@ import jkeum.gameengine.Move;
 import jkeum.gameengine.StateChangeNotification;
 import jkeum.gameengine.ai.minimax.MinimaxAI;
 import jkeum.gameengine.ai.minimax.MinimaxPruningAI;
-import jkeum.gameengine.interfaces.IFixedPiecePlayer;
 import jkeum.gameengine.interfaces.IMove;
-import jkeum.gameengine.interfaces.IPiece;
 import jkeum.gameengine.interfaces.IPlayer;
 import jkeum.gameengine.interfaces.IState;
 import jkeum.gameengine.interfaces.IStateChangeNotificationHandler;
-import jkeum.gameengine.tictactoe.TicTacToeMinimaxAICallback;
+import jkeum.gameengine.tictactoe.TicTacToeMoveGenerator;
 import jkeum.gameengine.tictactoe.TicTacToePiece;
 import jkeum.gameengine.tictactoe.TicTacToeState;
+import jkeum.gameengine.tictactoe.TicTacToeStateEvaluator;
 import jkeum.tictactoe.R;
 import jkeum.tictactoe.android.TicTacToeView.IGridClickEventHandler;
 import android.app.Activity;
 import android.os.Bundle;
 import android.widget.TextView;
 
-public class TicTacToeActivity extends Activity implements IFixedPiecePlayer,
+public class TicTacToeActivity extends Activity implements IPlayer,
 		IGridClickEventHandler, IStateChangeNotificationHandler {
 
 	/** Start player. Must be 1 or 2. Default is 1. */
@@ -62,17 +61,20 @@ public class TicTacToeActivity extends Activity implements IFixedPiecePlayer,
 		TicTacToeState state = new TicTacToeState(grid);
 		engine = new GameEngine(state);
 		state.addStateChangeNotificationHandler(this);
-		this.myPiece = TicTacToePiece.O;
 		mGameView.setGrid(grid);
 		mGameView.setGridClickEventHandler(this);
 
-		MinimaxAI ai = new MinimaxPruningAI(TicTacToePiece.X,
-				new TicTacToeMinimaxAICallback());
+		MinimaxAI ai = new MinimaxPruningAI(new TicTacToeStateEvaluator(),
+				new TicTacToeMoveGenerator());
 		ai.setMaxDepth(9);
 		Serializable startPlayer = getIntent().getSerializableExtra(
 				EXTRA_START_PLAYER);
 
-		if (startPlayer == null || ((TicTacToePiece) startPlayer) == myPiece) {
+		state.setPlayerPiece(this, TicTacToePiece.O);
+		state.setPlayerPiece(ai, TicTacToePiece.X);
+
+		if (startPlayer == null
+				|| ((TicTacToePiece) startPlayer) == TicTacToePiece.O) {
 			engine.start(this, ai);
 		} else {
 			engine.start(ai, this);
@@ -120,12 +122,10 @@ public class TicTacToeActivity extends Activity implements IFixedPiecePlayer,
 
 	private GridPosition userMove = new GridPosition(0, 0);
 
-	private TicTacToePiece myPiece;
-
 	private GameEngine engine;
 
 	@Override
-	public IMove computeMove(IState state) {
+	public IMove computeNextMove(IState state) {
 		Move<TicTacToePiece, GridPosition> move = null;
 		TicTacToeState currentState = (TicTacToeState) state;
 		GenericGrid<TicTacToePiece> grid = currentState.getGrid();
@@ -136,8 +136,9 @@ public class TicTacToeActivity extends Activity implements IFixedPiecePlayer,
 					userMove.wait();
 					if (grid.getPiece(userMove.row, userMove.col) == null) {
 						move = new Move<TicTacToePiece, GridPosition>(
-								this.myPiece, new GridPosition(userMove.row,
-										userMove.col));
+								(TicTacToePiece) currentState
+										.getPlayerPiece(this),
+								new GridPosition(userMove.row, userMove.col));
 					} else {
 						// invalid move
 					}
@@ -149,11 +150,6 @@ public class TicTacToeActivity extends Activity implements IFixedPiecePlayer,
 		}
 
 		return move;
-	}
-
-	@Override
-	public IPiece getPiece() {
-		return this.myPiece;
 	}
 
 	@Override
