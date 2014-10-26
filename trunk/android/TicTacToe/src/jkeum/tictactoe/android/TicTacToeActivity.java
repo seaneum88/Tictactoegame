@@ -32,6 +32,10 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 
 	private TicTacToeView mGameView;
 
+	private GridPosition userMove = new GridPosition(0, 0);
+
+	private GameEngine engine;
+
 	// private TextView mInfoView;
 
 	// private Button mButtonNext;
@@ -92,10 +96,6 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 
 	}
 
-	private GridPosition userMove = new GridPosition(0, 0);
-
-	private GameEngine engine;
-
 	@Override
 	public IMove computeNextMove(IState state) {
 		Move<TicTacToePiece, GridPosition> move = null;
@@ -137,21 +137,35 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 	@Override
 	public void notifyStateChange(IState source,
 			StateChangeNotification notification) {
+
+		TicTacToeState state = (TicTacToeState) source;
 		switch (notification) {
 		case MOVE_MADE:
 			updateUI();
 			break;
 		case TERMINATED:
-			TicTacToeState state = (TicTacToeState) source;
 			List<List<GridPosition>> winnings = state.getWinningPositions();
 			if (winnings == null) {
 				if (state.checkTie()) {
 					// we have a tie
 				} else {
-					throw new RuntimeException();
+					throw new RuntimeException(
+							"game over but no winner and not tie");
 				}
 			} else {
 				// we have a winner!
+				mGameView.setWinningPositions(winnings);
+				updateUI();
+			}
+			break;
+		case TURN_CHANGED:
+			IPlayer currentPlayer = state.getTurnManager().currentPlayer();
+			if (currentPlayer == this) {
+				TicTacToePiece piece = (TicTacToePiece) state
+						.getPlayerPiece(currentPlayer);
+				mGameView.setPreviewPiece(piece);
+			} else {
+				mGameView.setPreviewPiece(null);
 			}
 			break;
 		}
