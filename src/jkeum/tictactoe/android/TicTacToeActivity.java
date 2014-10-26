@@ -1,10 +1,10 @@
 package jkeum.tictactoe.android;
 
 import java.io.Serializable;
-import java.util.Random;
+import java.util.List;
 
 import jkeum.gameengine.GameEngine;
-import jkeum.gameengine.GenericGrid;
+import jkeum.gameengine.Grid;
 import jkeum.gameengine.GridPosition;
 import jkeum.gameengine.Move;
 import jkeum.gameengine.StateChangeNotification;
@@ -22,7 +22,6 @@ import jkeum.tictactoe.R;
 import jkeum.tictactoe.android.TicTacToeView.IGridClickEventHandler;
 import android.app.Activity;
 import android.os.Bundle;
-import android.widget.TextView;
 
 public class TicTacToeActivity extends Activity implements IPlayer,
 		IGridClickEventHandler, IStateChangeNotificationHandler {
@@ -31,9 +30,9 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 	public static final String EXTRA_START_PLAYER = TicTacToeActivity.class
 			.getName() + "EXTRA_START_PLAYER";
 
-	private Random mRnd = new Random();
 	private TicTacToeView mGameView;
-	private TextView mInfoView;
+
+	// private TextView mInfoView;
 
 	// private Button mButtonNext;
 
@@ -45,7 +44,7 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 		setContentView(R.layout.game_activity);
 
 		mGameView = (TicTacToeView) findViewById(R.id.game_view);
-		mInfoView = (TextView) findViewById(R.id.info_turn);
+		// mInfoView = (TextView) findViewById(R.id.info_turn);
 		// mButtonNext = (Button) findViewById(R.id.next_turn);
 
 		mGameView.setFocusable(true);
@@ -57,24 +56,24 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 	@Override
 	protected void onResume() {
 		super.onResume();
-		GenericGrid<TicTacToePiece> grid = new GenericGrid<TicTacToePiece>(3, 3);
+		Grid<TicTacToePiece> grid = new Grid<TicTacToePiece>(3, 3);
 		TicTacToeState state = new TicTacToeState(grid);
 		engine = new GameEngine(state);
-		state.addStateChangeNotificationHandler(this);
+		engine.addStateChangeNotificationHandler(this);
 		mGameView.setGrid(grid);
 		mGameView.setGridClickEventHandler(this);
 
 		MinimaxAI ai = new MinimaxPruningAI(new TicTacToeStateEvaluator(),
 				new TicTacToeMoveGenerator());
 		ai.setMaxDepth(9);
-		Serializable startPlayer = getIntent().getSerializableExtra(
+		Serializable startPlayerPiece = getIntent().getSerializableExtra(
 				EXTRA_START_PLAYER);
 
 		state.setPlayerPiece(this, TicTacToePiece.O);
 		state.setPlayerPiece(ai, TicTacToePiece.X);
 
-		if (startPlayer == null
-				|| ((TicTacToePiece) startPlayer) == TicTacToePiece.O) {
+		if (startPlayerPiece == null
+				|| ((TicTacToePiece) startPlayerPiece) == TicTacToePiece.O) {
 			engine.start(this, ai);
 		} else {
 			engine.start(ai, this);
@@ -90,35 +89,8 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 			userMove.row = position.row;
 			userMove.notify();
 		}
-		// int sxy = mCellSize;
-		// mBlinkRect.set(MARGIN + position.col * sxy, MARGIN + position.row
-		// * sxy, MARGIN + (position.col + 1) * sxy, MARGIN
-		// + (position.row + 1) * sxy);
-
-		// if (piece != State.EMPTY) {
-		// // Start the blinker
-		// mBlinkHandler.sendEmptyMessageDelayed(MSG_BLINK, FPS_MS);
-		// }
-
-		// if (mCellListener != null) {
-		// mCellListener.onCellSelected();
-		// }
 
 	}
-
-	//
-	// private class MyButtonListener implements OnClickListener {
-	//
-	// public void onClick(View v) {
-	// if (v == mButtonNext) {
-	// synchronized (userMove) {
-	// userMove.col = mGameView.getSelection().col;
-	// userMove.row = mGameView.getSelection().row;
-	// userMove.notify();
-	// }
-	// }
-	// }
-	// }
 
 	private GridPosition userMove = new GridPosition(0, 0);
 
@@ -128,7 +100,7 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 	public IMove computeNextMove(IState state) {
 		Move<TicTacToePiece, GridPosition> move = null;
 		TicTacToeState currentState = (TicTacToeState) state;
-		GenericGrid<TicTacToePiece> grid = currentState.getGrid();
+		Grid<TicTacToePiece> grid = currentState.getGrid();
 		try {
 			// get a move from user
 			do {
@@ -152,9 +124,7 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 		return move;
 	}
 
-	@Override
-	public void notifyStateChange(IState source,
-			StateChangeNotification notification) {
+	private void updateUI() {
 		this.runOnUiThread(new Runnable() {
 
 			@Override
@@ -162,5 +132,28 @@ public class TicTacToeActivity extends Activity implements IPlayer,
 				TicTacToeActivity.this.mGameView.invalidate();
 			}
 		});
+	}
+
+	@Override
+	public void notifyStateChange(IState source,
+			StateChangeNotification notification) {
+		switch (notification) {
+		case MOVE_MADE:
+			updateUI();
+			break;
+		case TERMINATED:
+			TicTacToeState state = (TicTacToeState) source;
+			List<List<GridPosition>> winnings = state.getWinningPositions();
+			if (winnings == null) {
+				if (state.checkTie()) {
+					// we have a tie
+				} else {
+					throw new RuntimeException();
+				}
+			} else {
+				// we have a winner!
+			}
+			break;
+		}
 	}
 }
