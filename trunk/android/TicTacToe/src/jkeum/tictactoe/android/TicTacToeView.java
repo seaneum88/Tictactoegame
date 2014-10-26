@@ -1,6 +1,8 @@
 package jkeum.tictactoe.android;
 
-import jkeum.gameengine.GenericGrid;
+import java.util.Random;
+
+import jkeum.gameengine.Grid;
 import jkeum.gameengine.GridPosition;
 import jkeum.gameengine.tictactoe.TicTacToePiece;
 import jkeum.tictactoe.R;
@@ -33,7 +35,7 @@ public class TicTacToeView extends View {
 	private final Rect mSrcRect = new Rect();
 	private final Rect mDstRect = new Rect();
 
-	private GenericGrid<TicTacToePiece> grid;
+	private Grid<TicTacToePiece> grid;
 	private int mCellSize;
 	private int mOffetX;
 	private int mOffetY;
@@ -59,7 +61,7 @@ public class TicTacToeView extends View {
 		void onGridClickEvent(GridPosition position);
 	}
 
-	public void setGrid(GenericGrid<TicTacToePiece> grid) {
+	public void setGrid(Grid<TicTacToePiece> grid) {
 		this.grid = grid;
 	}
 
@@ -98,12 +100,17 @@ public class TicTacToeView extends View {
 		mWinPaint.setStyle(Style.STROKE);
 
 		if (isInEditMode()) {
-			// // In edit mode (e.g. in the Eclipse ADT graphical layout editor)
-			// // we'll use some random data to display the state.
-			// Random rnd = new Random();
-			// for (int i = 0; i < mData.length; i++) {
-			// mData[i] = State.fromInt(rnd.nextInt(3));
-			// }
+			// In edit mode (e.g. in the Eclipse ADT graphical layout editor)
+			// we'll use some random data to display the state.
+			Random rnd = new Random();
+			grid = new Grid<TicTacToePiece>(3, 3);
+			for (int col = 0; col < 3; col++) {
+				for (int row = 0; row < 3; row++) {
+					grid.setPiece(row, col,
+							rnd.nextBoolean() ? TicTacToePiece.O
+									: TicTacToePiece.X);
+				}
+			}
 		}
 	}
 
