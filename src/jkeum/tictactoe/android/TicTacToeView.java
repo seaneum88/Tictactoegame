@@ -1,9 +1,11 @@
 package jkeum.tictactoe.android;
 
+import java.util.List;
 import java.util.Random;
 
 import jkeum.gameengine.Grid;
 import jkeum.gameengine.GridPosition;
+import jkeum.gameengine.Move;
 import jkeum.gameengine.tictactoe.TicTacToePiece;
 import jkeum.tictactoe.R;
 import android.content.Context;
@@ -14,7 +16,10 @@ import android.graphics.BitmapFactory;
 import android.graphics.BitmapFactory.Options;
 import android.graphics.Canvas;
 import android.graphics.Paint;
+import android.graphics.Paint.Cap;
+import android.graphics.Paint.Join;
 import android.graphics.Paint.Style;
+import android.graphics.Path;
 import android.graphics.Rect;
 import android.graphics.drawable.Drawable;
 import android.os.Bundle;
@@ -28,34 +33,37 @@ public class TicTacToeView extends View {
 	public static final long FPS_MS = 1000 / 2;
 
 	private static final int MARGIN = 4;
-	private static final int MSG_BLINK = 1;
 
-	// private final Handler mBlinkHandler = new Handler(new BlinkHandler());
-
-	private final Rect mSrcRect = new Rect();
-	private final Rect mDstRect = new Rect();
+	private final Rect srcRect = new Rect();
+	private final Rect dstRect = new Rect();
 
 	private Grid<TicTacToePiece> grid;
-	private int mCellSize;
-	private int mOffetX;
-	private int mOffetY;
-	private Paint mWinPaint;
-	private Paint mLinePaint;
-	private Paint mBmpPaint;
-	private Bitmap mBmpX;
-	private Bitmap mBmpO;
-	private Drawable mDrawableBg;
-
-	// private ICellListener mCellListener;
-
-	// private GridPosition mSelectedCell;
-	// private TicTacToePiece mSelectedPiece = null;
-	// private IFixedPiecePlayer mCurrentPlayer = null;
-
-	// private boolean mBlinkDisplayOff;
-	// private final Rect mBlinkRect = new Rect();
+	private int cellSize;
+	private int offetX;
+	private int offetY;
+	private Paint winningPaint;
+	private Paint linePaint;
+	private Paint bmpPaint;
+	private Bitmap bmpX;
+	private Bitmap bmpO;
+	private Drawable drawableBg;
 
 	private IGridClickEventHandler gridClickEventHandler;
+
+	private List<List<GridPosition>> winnings;
+
+	private Path winningPath;
+
+	private Move<TicTacToePiece, GridPosition> movePreview = new Move<TicTacToePiece, GridPosition>(
+			null, new GridPosition(0, 0));
+
+	private TicTacToePiece previewPiece;
+
+	private Paint previewPaint;;
+
+	public void setWinningPositions(List<List<GridPosition>> winnings) {
+		this.winnings = winnings;
+	}
 
 	public static interface IGridClickEventHandler {
 		void onGridClickEvent(GridPosition position);
@@ -69,35 +77,38 @@ public class TicTacToeView extends View {
 		this.gridClickEventHandler = handler;
 	}
 
-	// public interface ICellListener {
-	// abstract void onCellSelected();
-	// }
-
 	public TicTacToeView(Context context, AttributeSet attrs) {
 		super(context, attrs);
 		requestFocus();
 
-		mDrawableBg = getResources().getDrawable(R.drawable.lib_bg);
-		setBackgroundDrawable(mDrawableBg);
+		drawableBg = getResources().getDrawable(R.drawable.lib_bg);
+		setBackgroundDrawable(drawableBg);
 
-		mBmpX = getResBitmap(R.drawable.lib_cross);
-		mBmpO = getResBitmap(R.drawable.lib_circle);
+		bmpX = getResBitmap(R.drawable.lib_cross);
+		bmpO = getResBitmap(R.drawable.lib_circle);
 
-		if (mBmpX != null) {
-			mSrcRect.set(0, 0, mBmpX.getWidth() - 1, mBmpX.getHeight() - 1);
+		if (bmpX != null) {
+			srcRect.set(0, 0, bmpX.getWidth() - 1, bmpX.getHeight() - 1);
 		}
 
-		mBmpPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+		bmpPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-		mLinePaint = new Paint();
-		mLinePaint.setColor(0xFFFFFFFF);
-		mLinePaint.setStrokeWidth(5);
-		mLinePaint.setStyle(Style.STROKE);
+		previewPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
 
-		mWinPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
-		mWinPaint.setColor(0xFFFF0000);
-		mWinPaint.setStrokeWidth(10);
-		mWinPaint.setStyle(Style.STROKE);
+		linePaint = new Paint();
+		linePaint.setColor(0xFFFFFFFF);
+		linePaint.setStrokeWidth(5);
+		linePaint.setStyle(Style.STROKE);
+		linePaint.setStrokeJoin(Join.ROUND);
+		linePaint.setStrokeCap(Cap.ROUND);
+
+		winningPaint = new Paint(Paint.ANTI_ALIAS_FLAG);
+		winningPaint.setColor(0xFFFF0000);
+		winningPaint.setStrokeWidth(10);
+		winningPaint.setStyle(Style.STROKE);
+		winningPaint.setStrokeJoin(Join.ROUND);
+		winningPaint.setStrokeCap(Cap.ROUND);
+		winningPath = new Path();
 
 		if (isInEditMode()) {
 			// In edit mode (e.g. in the Eclipse ADT graphical layout editor)
@@ -114,105 +125,82 @@ public class TicTacToeView extends View {
 		}
 	}
 
-	// public void setCell(int cellIndex, State value) {
-	// mData[cellIndex] = value;
-	// invalidate();
-	// }
-	//
-	// public GridPosition getSelection() {
-	// if (mSelectedPiece != null) {
-	// if (mSelectedPiece.equals(mCurrentPlayer.getPiece())) {
-	// return mSelectedCell;
-	// }
-	// }
-	// return null;
-	// }
-	//
-	// public IFixedPiecePlayer getCurrentPlayer() {
-	// return mCurrentPlayer;
-	// }
-	//
-	// public void setCurrentPlayer(IFixedPiecePlayer player) {
-	// mCurrentPlayer = player;
-	// mSelectedCell = null;
-	// }
-
-	// -----------------------------------------
-
 	@Override
 	protected void onDraw(Canvas canvas) {
 		super.onDraw(canvas);
 
-		int cellSize = mCellSize;
 		int cellSize3 = cellSize * 3;
-		int offsetX = mOffetX;
-		int offsetY = mOffetY;
+		int offsetX = offetX;
+		int offsetY = offetY;
 
 		for (int i = 0, k = cellSize; i < 2; i++, k += cellSize) {
 			canvas.drawLine(offsetX, offsetY + k, offsetX + cellSize3 - 1,
-					offsetY + k, mLinePaint);
+					offsetY + k, linePaint);
 			canvas.drawLine(offsetX + k, offsetY, offsetX + k, offsetY
-					+ cellSize3 - 1, mLinePaint);
+					+ cellSize3 - 1, linePaint);
 		}
 
 		for (int row = 0, y = offsetY; row < 3; row++, y += cellSize) {
 			for (int col = 0, x = offsetX; col < 3; col++, x += cellSize) {
-				mDstRect.offsetTo(MARGIN + x, MARGIN + y);
+				dstRect.offsetTo(MARGIN + x, MARGIN + y);
 
-				TicTacToePiece piece;
-				// if (mSelectedCell != null && mSelectedCell.col == col
-				// && mSelectedCell.row == row) {
-				// if (mBlinkDisplayOff) {
-				// continue;
-				// }
-				// piece = mSelectedPiece;
-				// } else {
-				piece = grid.getPiece(row, col);
-				// }
+				TicTacToePiece piece = grid.getPiece(row, col);
 
 				if (piece != null) {
 					switch (piece) {
 					case X:
-						if (mBmpX != null) {
-							canvas.drawBitmap(mBmpX, mSrcRect, mDstRect,
-									mBmpPaint);
+						if (bmpX != null) {
+							canvas.drawBitmap(bmpX, srcRect, dstRect, bmpPaint);
 						}
 						break;
 					case O:
-						if (mBmpO != null) {
-							canvas.drawBitmap(mBmpO, mSrcRect, mDstRect,
-									mBmpPaint);
+						if (bmpO != null) {
+							canvas.drawBitmap(bmpO, srcRect, dstRect, bmpPaint);
 						}
 						break;
 					}
 				}
 			}
 		}
-		//
-		// if (mWinRow >= 0) {
-		// int y = offsetY + mWinRow * cellSize + cellSize / 2;
-		// canvas.drawLine(offsetX + MARGIN, y, offsetX + cellSize3 - 1
-		// - MARGIN, y, mWinPaint);
-		//
-		// } else if (mWinCol >= 0) {
-		// int x = offsetX + mWinCol * cellSize + cellSize / 2;
-		// canvas.drawLine(x, offsetY + MARGIN, x, offsetY + cellSize3 - 1
-		// - MARGIN, mWinPaint);
-		//
-		// } else if (mWinDiag == 0) {
-		// // diagonal 0 is from (0,0) to (2,2)
-		//
-		// canvas.drawLine(offsetX + MARGIN, offsetY + MARGIN, offsetX
-		// + cellSize3 - 1 - MARGIN, offsetY + cellSize3 - 1 - MARGIN,
-		// mWinPaint);
-		//
-		// } else if (mWinDiag == 1) {
-		// // diagonal 1 is from (0,2) to (2,0)
-		//
-		// canvas.drawLine(offsetX + MARGIN, offsetY + cellSize3 - 1 - MARGIN,
-		// offsetX + cellSize3 - 1 - MARGIN, offsetY + MARGIN,
-		// mWinPaint);
-		// }
+		if (movePreview.getPiece() != null) {
+			dstRect.offsetTo(
+					MARGIN + offsetX + cellSize * movePreview.getPosition().col,
+					MARGIN + offsetY + cellSize * movePreview.getPosition().row);
+			TicTacToePiece piece = movePreview.getPiece();
+			switch (piece) {
+			case X:
+				if (bmpX != null) {
+					canvas.drawBitmap(bmpX, srcRect, dstRect, previewPaint);
+				}
+				break;
+			case O:
+				if (bmpO != null) {
+					canvas.drawBitmap(bmpO, srcRect, dstRect, previewPaint);
+				}
+				break;
+			}
+		}
+		if (winnings != null) {
+			for (List<GridPosition> winning : winnings) {
+				winningPath.reset();
+				for (int i = 0; i < winning.size(); i++) {
+					float x = winning.get(i).col * cellSize;
+					float y = winning.get(i).row * cellSize;
+					if (i == 0) {
+						winningPath.moveTo(x, y);
+					} else {
+						winningPath.lineTo(x, y);
+					}
+				}
+				winningPath.offset(
+						offsetX + cellSize / 2 + winningPaint.getStrokeWidth()
+								/ 4,
+						offsetY + cellSize / 2 + winningPaint.getStrokeWidth()
+								/ 4);
+				canvas.drawPath(winningPath, winningPaint);
+			}
+		}
+
 	}
 
 	@Override
@@ -233,32 +221,48 @@ public class TicTacToeView extends View {
 
 		int size = sx < sy ? sx : sy;
 
-		mCellSize = size;
-		mOffetX = (w - 3 * size) / 2;
-		mOffetY = (h - 3 * size) / 2;
+		cellSize = size;
+		offetX = (w - 3 * size) / 2;
+		offetY = (h - 3 * size) / 2;
 
-		mDstRect.set(MARGIN, MARGIN, size - MARGIN, size - MARGIN);
+		dstRect.set(MARGIN, MARGIN, size - MARGIN, size - MARGIN);
 	}
 
 	@Override
 	public boolean onTouchEvent(MotionEvent event) {
 		int action = event.getAction();
 
-		if (action == MotionEvent.ACTION_DOWN) {
+		if (action == MotionEvent.ACTION_DOWN
+				|| action == MotionEvent.ACTION_MOVE) {
+			int col = (int) event.getX();
+			int row = (int) event.getY();
+
+			col = (col - MARGIN) / cellSize;
+			row = (row - MARGIN) / cellSize;
+
+			if (isEnabled() && col >= 0 && col < 3 && row >= 0 & row < 3) {
+				if (grid.getPiece(row, col) == null) {
+					movePreview.getPosition().row = row;
+					movePreview.getPosition().col = col;
+					movePreview.setPiece(this.previewPiece);
+				} else {
+					movePreview.setPiece(null);
+				}
+				this.invalidate();
+			}
 			return true;
 
 		} else if (action == MotionEvent.ACTION_UP) {
 			int col = (int) event.getX();
 			int row = (int) event.getY();
 
-			int cellSize = mCellSize;
 			col = (col - MARGIN) / cellSize;
 			row = (row - MARGIN) / cellSize;
 
 			if (isEnabled() && col >= 0 && col < 3 && row >= 0 & row < 3) {
 				GridPosition cell = new GridPosition(row, col);
 
-				// this.mSelectedCell = cell;
+				movePreview.setPiece(null);
 				if (this.gridClickEventHandler != null) {
 					this.gridClickEventHandler.onGridClickEvent(cell);
 				} else {
@@ -272,21 +276,6 @@ public class TicTacToeView extends View {
 
 		return false;
 	}
-
-	// public void stopBlink() {
-	// boolean hadSelection = mSelectedCell != null && mSelectedPiece != null;
-	// mSelectedCell = null;
-	// mSelectedPiece = null;
-	// if (!mBlinkRect.isEmpty()) {
-	// invalidate(mBlinkRect);
-	// }
-	// mBlinkDisplayOff = false;
-	// mBlinkRect.setEmpty();
-	// mBlinkHandler.removeMessages(MSG_BLINK);
-	// if (hadSelection && mCellListener != null) {
-	// mCellListener.onCellSelected();
-	// }
-	// }
 
 	@Override
 	protected Parcelable onSaveInstanceState() {
@@ -359,27 +348,6 @@ public class TicTacToeView extends View {
 		super.onRestoreInstanceState(superState);
 	}
 
-	// -----
-
-	// private class BlinkHandler implements Callback {
-	// public boolean handleMessage(Message msg) {
-	// if (msg.what == MSG_BLINK) {
-	// if (mSelectedCell != null && mSelectedPiece != null
-	// && mBlinkRect.top != 0) {
-	// mBlinkDisplayOff = !mBlinkDisplayOff;
-	// invalidate(mBlinkRect);
-	//
-	// if (!mBlinkHandler.hasMessages(MSG_BLINK)) {
-	// mBlinkHandler
-	// .sendEmptyMessageDelayed(MSG_BLINK, FPS_MS);
-	// }
-	// }
-	// return true;
-	// }
-	// return false;
-	// }
-	// }
-
 	private Bitmap getResBitmap(int bmpResId) {
 		Options opts = new Options();
 		opts.inDither = false;
@@ -402,5 +370,10 @@ public class TicTacToeView extends View {
 		}
 
 		return bmp;
+	}
+
+	public void setPreviewPiece(TicTacToePiece piece) {
+		this.previewPiece = piece;
+
 	}
 }
